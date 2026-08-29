@@ -15,8 +15,8 @@ if something has changed.
 | 1 | Amazon | https://www.amazon.com | Shopping | "Rufus" AI shopping assistant | Search, category filters, product specs, reviews | |
 | 2 | Google Search | https://www.google.com | Search | AI Overview panel | Traditional 10 blue links | |
 | 3 | eBay | https://www.ebay.com | Shopping | AI shopping assistant / AI-generated item features | Search, categories, item specifics, seller reviews | |
-| 4 | [News site TBD] | | News | AI-generated summary box | Full article, byline, sources, comments | |
-| 5 | [SaaS support page TBD] | | Support | AI chatbot widget | "Contact us" / human support link, help search | |
+| 4 | Yahoo News | https://www.yahoo.com | News | AI-generated summary box | Full article, byline, sources, comments | |
+| 5 | Intercom | https://www.intercom.com | Support | AI chatbot widget | "Contact us" / human support link, help search | |
 
 ## Held-Out Sites (8–10) — evaluation only, never used to tune
 
