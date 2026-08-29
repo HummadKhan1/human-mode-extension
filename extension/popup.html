@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="title-group">
+        <h1>Human Mode</h1>
+        <p class="subtitle">Agent-classified, not hardcoded</p>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="toggle">
+        <span class="slider"></span>
+      </label>
+    </header>
+
+    <section class="status" id="status">
+      <p class="status-line">Reload the page to see results here.</p>
+    </section>
+
+    <section class="settings">
+      <label for="apiKey">Anthropic API key</label>
+      <input type="password" id="apiKey" placeholder="sk-ant-...">
+
+      <label for="model">Model</label>
+      <select id="model">
+        <option value="claude-haiku-4-5-20251001">Haiku — fast, cheap</option>
+        <option value="claude-sonnet-5">Sonnet — more accurate</option>
+      </select>
+
+      <button id="save">Save settings</button>
+      <p class="save-note" id="saveNote"></p>
+    </section>
+
+    <p class="hint">Your API key is stored locally in this browser only. It is sent directly to api.anthropic.com, not to any third-party server.</p>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

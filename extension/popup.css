@@ -1,0 +1,117 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  width: 300px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #1c1f26;
+  color: #e8eaed;
+}
+
+.app { padding: 16px; }
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+h1 {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  font-size: 11px;
+  color: #8b93a1;
+  margin-top: 2px;
+}
+
+/* Toggle switch */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 22px;
+  flex-shrink: 0;
+}
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #3a3f4b;
+  border-radius: 22px;
+  transition: 0.15s;
+}
+.slider::before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #e8eaed;
+  border-radius: 50%;
+  transition: 0.15s;
+}
+input:checked + .slider { background-color: #4f8cff; }
+input:checked + .slider::before { transform: translateX(16px); }
+
+.status {
+  background: #262a33;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  color: #c3c9d4;
+  line-height: 1.5;
+}
+
+.settings label {
+  display: block;
+  font-size: 11px;
+  color: #8b93a1;
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+
+.settings input,
+.settings select {
+  width: 100%;
+  padding: 7px 8px;
+  background: #262a33;
+  border: 1px solid #3a3f4b;
+  border-radius: 6px;
+  color: #e8eaed;
+  font-size: 12px;
+}
+
+#save {
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px;
+  background: #4f8cff;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+#save:hover { background: #3d7aef; }
+
+.save-note {
+  font-size: 11px;
+  color: #6fcf97;
+  margin-top: 6px;
+  min-height: 14px;
+}
+
+.hint {
+  font-size: 10px;
+  color: #6b7280;
+  margin-top: 14px;
+  line-height: 1.4;
+}

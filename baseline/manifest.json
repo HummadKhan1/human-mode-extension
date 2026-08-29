@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Human Mode - Baseline",
+  "version": "0.1.0",
+  "description": "Baseline: hardcoded selectors for known sites only (Amazon, Google, Bing, Zendesk). Does not generalize to sites it wasn't written for.",
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

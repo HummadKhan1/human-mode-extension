@@ -1,0 +1,113 @@
+{
+  "_notes": "Ground truth for scoring the baseline (hardcoded selectors) and agent (DOM classifier) against known and held-out sites. 'remove' = AI elements that should be hidden/removed. 'keep' = real content that must NOT be touched (used to catch false positives). 'surface' = elements that should be made more visible if currently buried.",
+
+  "known_sites": {
+    "amazon": {
+      "url": "https://www.amazon.com",
+      "category": "shopping",
+      "verified_date": "2026-08-29",
+      "notes": "Amazon renamed Rufus to 'Alexa for Shopping' around May 2026. DOM still uses 'rufus' in ids/classes as of verification date. Widget shown as a disco-style avatar with 'for shopping' label in the nav bar.",
+      "remove": [
+        {
+          "description": "Rufus / Alexa for Shopping AI assistant avatar + label in nav",
+          "selector_hint": "#nav-rufus-disco-avatar, #nav-rufus-disco-text",
+          "raw_html": "<div id=\"nav-rufus-disco-avatar\" class=\"nav-rufus-disco-avatar\"></div><div id=\"nav-rufus-disco-text\" class=\"nav-rufus-disco-text\">for shopping</div>",
+          "outer_wrapper": "TODO - confirm if there's a parent container wrapping both nodes",
+          "click_behavior": "TODO - what opens when clicked (chat panel selector)"
+        }
+      ],
+      "keep": [
+        {
+          "description": "Search bar",
+          "selector_hint": "#twotabsearchtextbox",
+          "raw_html": "<input type=\"text\" id=\"twotabsearchtextbox\" value=\"\" name=\"field-keywords\" autocomplete=\"off\" placeholder=\"Order groceries on Amazon\" class=\"nav-input nav-progressive-attribute hokuto-rotate-fade\" dir=\"auto\" tabindex=\"0\" aria-label=\"Search Amazon\" role=\"searchbox\" aria-autocomplete=\"list\" aria-controls=\"sac-autocomplete-results-container\" aria-expanded=\"true\" aria-haspopup=\"grid\" spellcheck=\"false\">"
+        }
+      ],
+      "surface": []
+    },
+
+    "google_search": {
+      "url": "https://www.google.com/search?q=...",
+      "category": "search",
+      "verified_date": null,
+      "notes": "Must run an actual search query, not visit homepage, to see AI Overview.",
+      "remove": [
+        {
+          "description": "AI Overview panel heading at top of results",
+          "selector_hint": "[aria-level='2'][role='heading'] containing text 'AI Overview' (note: class name 'Fzsovc' is obfuscated/build-specific and will likely change between deploys - the aria-level+role+text pattern is the more durable signal)",
+          "raw_html": "<div jsname=\"cUzNTd\" class=\"Fzsovc\" aria-level=\"2\" role=\"heading\">AI Overview</div>"
+        }
+      ],
+      "keep": [
+        {
+          "description": "Traditional organic search result links",
+          "selector_hint": "TODO",
+          "raw_html": "TODO"
+        }
+      ],
+      "surface": []
+    },
+
+    "bing": {
+      "url": "https://www.bing.com/search?q=...",
+      "category": "search",
+      "verified_date": null,
+      "notes": "Must run an actual search query to see Copilot/AI summary card.",
+      "remove": [
+        {
+          "description": "AI-generated answer box with generated steps/prose + 'Learn more' sources list (Bing's generative answer pattern)",
+          "selector_hint": ".devmag_cntnt_snip (generated content), .rd_cnt_srcs (sources block) - note these are likely obfuscated/internal class names, may change between deploys. Structural pattern (generated prose block immediately followed by a distinct numbered sources list) may be more durable than the exact class names.",
+          "raw_html": "<div><span class=\"devmag_cntnt_snip\"><ol class=\"b_dList\">...generated step-by-step answer...</ol></span></div><div class=\"rd_cnt_srcs b_hide\"><div class=\"rd_attr_lm\">Learn more:</div><div class=\"rd_attr_cntnr\">...source links...</div></div>"
+        }
+      ],
+      "keep": [
+        {
+          "description": "Traditional organic search result link",
+          "selector_hint": "plain <a> tag with h='ID=SERP,...' attribute, no devmag_cntnt_snip or rd_cnt_srcs wrapper",
+          "raw_html": "<a target=\"_blank\" href=\"https://tecnobits.com/en/Remove-AI-summaries-from-your-Bing-searches/\" h=\"ID=SERP,5176.2\" style=\"\">How to remove AI summaries from your Bing searches</a>"
+        }
+      ],
+      "surface": []
+    },
+
+    "zendesk": {
+      "url": "https://www.zendesk.com",
+      "category": "support",
+      "verified_date": null,
+      "notes": "Swapped in for Notion Help Center - Zendesk sells AI support chatbots as their core product, so their own site is a reliable, guaranteed placement rather than a rollout-dependent feature.",
+      "remove": [
+        {
+          "description": "AI chatbot widget launcher (lives in an embedded iframe, identified by its accessible title text rather than a class name)",
+          "selector_hint": "iframe with title matching pattern 'Button to launch messaging window' - a strong semantic/aria signal, more durable than a CSS class since it's plain-English accessibility text describing the element's purpose",
+          "raw_html": "<title>Button to launch messaging window, 2 unread messages</title> (found inside an iframe on the page, wrapping an SVG speech-bubble icon)"
+        }
+      ],
+      "keep": [
+        {
+          "description": "Help/search bar or main navigation",
+          "selector_hint": "TODO",
+          "raw_html": "TODO"
+        }
+      ],
+      "surface": [
+        {
+          "description": "Human contact / 'talk to a human' link, if buried behind the chatbot",
+          "selector_hint": "TODO",
+          "raw_html": "TODO"
+        }
+      ]
+    }
+  },
+
+  "held_out_sites": {
+    "best_buy": { "url": "https://www.bestbuy.com", "category": "shopping", "verified_date": null, "remove": [], "keep": [], "surface": [] },
+    "walmart": { "url": "https://www.walmart.com", "category": "shopping", "verified_date": null, "remove": [], "keep": [], "surface": [] },
+    "etsy": { "url": "https://www.etsy.com", "category": "shopping", "verified_date": null, "remove": [], "keep": [], "surface": [] },
+    "google_news": { "url": "https://news.google.com", "category": "news", "verified_date": null, "remove": [], "keep": [], "surface": [] },
+    "yahoo_news": { "url": "https://news.yahoo.com", "category": "news", "verified_date": null, "remove": [], "keep": [], "surface": [] },
+    "local_news_tbd": { "url": "TBD", "category": "news", "verified_date": null, "notes": "Designated hard case candidate", "remove": [], "keep": [], "surface": [] },
+    "shopify_help": { "url": "https://help.shopify.com", "category": "support", "verified_date": null, "remove": [], "keep": [], "surface": [] },
+    "spotify_support": { "url": "https://support.spotify.com", "category": "support", "verified_date": null, "remove": [], "keep": [], "surface": [] },
+    "stripe_support": { "url": "https://support.stripe.com", "category": "support", "verified_date": null, "remove": [], "keep": [], "surface": [] }
+  }
+}

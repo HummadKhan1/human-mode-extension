@@ -14,10 +14,13 @@ the "Verified" column with the date you checked.
 | # | Site | URL | Category | AI element to target | Human-first element to keep/surface | Verified |
 |---|------|-----|----------|----------------------|--------------------------------------|----------|
 | 1 | Amazon | https://www.amazon.com | Shopping | "Rufus" AI shopping assistant | Search, category filters, product specs, reviews | [ ] |
-| 2 | Google Search | https://www.google.com/search?q=... (must search a query, not homepage) | Search | AI Overview panel | Traditional 10 blue links | [ ] |
-| 3 | eBay | https://www.ebay.com | Shopping | AI shopping assistant / AI item features | Search, categories, item specifics, seller reviews | [ ] |
-| 4 | Bing (search a query) | https://www.bing.com/search?q=... | News/Search | AI/Copilot summary card | Traditional search results | [ ] |
-| 5 | Notion Help Center | https://www.notion.so/help | Support | AI chatbot widget (bottom-right bubble) | "Talk to a human" / contact support link, help search | [ ] |
+| 2 | Google Search | https://www.google.com/search?q=... (must search a query, not homepage) | Search | AI Overview panel | Traditional 10 blue links | [x] 2026-08-29 |
+| 3 | Bing (search a query) | https://www.bing.com/search?q=... | News/Search | AI/Copilot summary card | Traditional search results | [ ] |
+| 4 | Zendesk.com | https://www.zendesk.com | Support | AI chatbot widget (Zendesk sells this as their core product, guaranteed placement) | "Talk to a human" / contact support link | [ ] |
+
+**Note:** eBay was dropped from known sites — its AI shopping agent is only rolled out to a
+small percentage of accounts, making it unreliable to test against consistently.
+Shopping category is still covered via 3 held-out sites below (Best Buy, Walmart, Etsy).
 
 ## Held-Out Sites (8–10) — evaluation only, never used to tune
 
