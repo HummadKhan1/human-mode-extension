@@ -1,86 +1,164 @@
-// Human Mode - Baseline
-// Hardcoded selectors for exactly the 4 sites we manually inspected via DevTools.
-// This is intentionally "dumb" - it represents what existing tools like
-// "Bye Bye Google AI" or "EAI - Eliminate AI" do: a per-site selector list
-// that breaks the moment a site redesigns, and does nothing at all on any
-// site it wasn't specifically written for.
+// Human Mode - Agent
+//
+// Pipeline:
+// 1. Extract candidate elements using broad heuristics (recall-focused: iframes,
+//    fixed/sticky-positioned elements, headings, elements whose id/class/aria-label/
+//    text loosely matches AI-related keywords). This is deliberately generous -
+//    false positives here are cheap, since the classifier filters them next.
+// 2. Send candidates to the background service worker, which asks Claude to
+//    classify each one as remove / keep / surface, with required text evidence.
+// 3. Background does a programmatic verification pass: every "remove"/"surface"
+//    decision must have evidence text that actually appears in that element's
+//    captured attributes. Decisions that fail this check are discarded before
+//    ever reaching the page - this is what catches a hallucinated removal.
+// 4. Apply only the verified decisions to the live DOM.
 
-const SITE_RULES = [
-  {
-    name: "amazon",
-    hostnameIncludes: "amazon.",
-    remove: [
-      { selector: "#nav-rufus-disco-avatar" },
-      { selector: "#nav-rufus-disco-text" }
-    ]
-  },
-  {
-    name: "google_search",
-    hostnameIncludes: "google.",
-    remove: [
-      // Google's class names (e.g. "Fzsovc") are obfuscated/build-specific and
-      // change between deploys, so we match by role + aria-level + text instead.
-      { selector: '[role="heading"][aria-level="2"]', textMatch: "AI Overview", removeAncestorLevels: 3 }
-    ]
-  },
-  {
-    name: "bing",
-    hostnameIncludes: "bing.",
-    remove: [
-      { selector: ".devmag_cntnt_snip", removeAncestorLevels: 2 },
-      { selector: ".rd_cnt_srcs" }
-    ]
-  },
-  {
-    name: "zendesk",
-    hostnameIncludes: "zendesk.",
-    remove: [
-      { selector: 'iframe[title*="launch messaging" i]' }
-    ]
-  }
+const AI_KEYWORDS = [
+  "chat", "assistant", "copilot", "chatbot", "virtual assistant",
+  "ai overview", "ai summary", "ai-generated", "rufus", "ask ai",
+  "overview", "bot widget", "messaging window"
 ];
 
-function applyBaseline() {
-  const host = window.location.hostname;
-  const rule = SITE_RULES.find(r => host.includes(r.hostnameIncludes));
+function getCandidates() {
+  const all = document.querySelectorAll("body *");
+  const MAX_CANDIDATES = 60;
 
-  if (!rule) {
-    console.log(`[Human Mode - Baseline] No hardcoded rules for "${host}". This site is untouched.`);
-    return { matched: false, site: null, removedCount: 0 };
+  // Two priority tiers instead of one flat cap. Real pages often load many
+  // unrelated iframes (ads, analytics, tracking pixels) before the actual
+  // AI widget appears in the DOM. Capturing in raw document order let junk
+  // iframes fill the candidate budget before we ever reached the one that
+  // mattered - this happened on Zendesk, where the real chat launcher iframe
+  // was the last of ~11 iframes on the page, the rest were ad/tracking iframes.
+  // Fix: collect keyword-matched elements first (highest-confidence signal),
+  // then fill any remaining budget with generic iframe/fixed/heading elements.
+  const priority = [];
+  const fallback = [];
+
+  for (const el of all) {
+    if (el.hasAttribute("data-human-mode-id")) continue;
+
+    const tag = el.tagName.toLowerCase();
+    const id = el.id || "";
+    const cls = (typeof el.className === "string") ? el.className : "";
+    const ariaLabel = el.getAttribute("aria-label") || "";
+    const title = el.getAttribute("title") || "";
+    const role = el.getAttribute("role") || "";
+    const ariaLevel = el.getAttribute("aria-level") || "";
+    const text = (el.textContent || "").trim().slice(0, 150);
+
+    const isIframe = tag === "iframe";
+    const isHeading2 = role === "heading" && ariaLevel === "2";
+
+    let isFixed = false;
+    try {
+      const pos = window.getComputedStyle(el).position;
+      isFixed = pos === "fixed" || pos === "sticky";
+    } catch (e) {
+      // ignore elements we can't compute style for
+    }
+
+    let iframeTitle = "";
+    if (isIframe) {
+      try {
+        iframeTitle = el.contentDocument?.title || "";
+      } catch (e) {
+        // cross-origin iframe, can't read title from JS - use the iframe's own title attr instead
+        iframeTitle = title;
+      }
+    }
+
+    const haystack = [id, cls, ariaLabel, title, text, iframeTitle].join(" ").toLowerCase();
+    const matchesKeyword = AI_KEYWORDS.some(k => haystack.includes(k));
+
+    const record = {
+      tag, id, class: cls.slice(0, 150), ariaLabel, title, role,
+      text: (iframeTitle || text).slice(0, 150),
+      _el: el
+    };
+
+    if (matchesKeyword) {
+      priority.push(record);
+    } else if (isIframe || isFixed || isHeading2) {
+      fallback.push(record);
+    }
   }
 
-  let removedCount = 0;
-  rule.remove.forEach(r => {
-    let els;
-    try {
-      els = document.querySelectorAll(r.selector);
-    } catch (e) {
-      console.log(`[Human Mode - Baseline] Selector failed: ${r.selector}`, e);
-      return;
-    }
-    els.forEach(el => {
-      if (r.textMatch && !el.textContent.includes(r.textMatch)) return;
-
-      let target = el;
-      if (r.removeAncestorLevels) {
-        for (let i = 0; i < r.removeAncestorLevels; i++) {
-          if (target.parentElement) target = target.parentElement;
-        }
-      }
-      target.style.setProperty("display", "none", "important");
-      target.setAttribute("data-human-mode-removed", "baseline");
-      removedCount++;
-    });
+  const selected = priority.concat(fallback).slice(0, MAX_CANDIDATES);
+  return selected.map((record, index) => {
+    record._el.setAttribute("data-human-mode-id", String(index));
+    const { _el, ...rest } = record;
+    return { index, ...rest };
   });
-
-  console.log(`[Human Mode - Baseline] Matched rule "${rule.name}". Removed ${removedCount} element(s).`);
-  return { matched: true, site: rule.name, removedCount };
 }
 
-chrome.storage.local.get(["humanModeEnabled"], (data) => {
-  if (data.humanModeEnabled === false) return; // default: on
-  const result = applyBaseline();
-  chrome.storage.local.set({
-    [`baseline_lastResult_${window.location.hostname}`]: { ...result, timestamp: Date.now() }
+function applyDecisions(decisions) {
+  let removedCount = 0;
+  let surfacedCount = 0;
+
+  decisions.forEach(d => {
+    const el = document.querySelector(`[data-human-mode-id="${d.index}"]`);
+    if (!el) return;
+
+    if (d.action === "remove") {
+      el.style.setProperty("display", "none", "important");
+      el.setAttribute("data-human-mode-removed", "agent");
+      el.setAttribute("data-human-mode-reason", d.reason || "");
+      removedCount++;
+    } else if (d.action === "surface") {
+      el.style.setProperty("outline", "3px solid #2563eb", "important");
+      el.style.setProperty("outline-offset", "2px", "important");
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      surfacedCount++;
+    }
   });
-});
+
+  return { removedCount, surfacedCount };
+}
+
+(function main() {
+  chrome.storage.local.get(["humanModeEnabled"], (data) => {
+    if (data.humanModeEnabled === false) return; // default: on
+
+    const candidates = getCandidates();
+    if (candidates.length === 0) {
+      console.log("[Human Mode] No candidate elements found on this page.");
+      return;
+    }
+
+    const payload = {
+      url: window.location.href,
+      hostname: window.location.hostname,
+      title: document.title,
+      candidates
+    };
+
+    chrome.runtime.sendMessage({ type: "classify", payload }, (response) => {
+      if (!response) {
+        console.log("[Human Mode] No response from background worker.");
+        return;
+      }
+      if (response.error) {
+        console.log("[Human Mode] Classification error:", response.error);
+        chrome.storage.local.set({
+          [`lastResult_${window.location.hostname}`]: {
+            error: response.error, timestamp: Date.now()
+          }
+        });
+        return;
+      }
+
+      const { removedCount, surfacedCount } = applyDecisions(response.decisions || []);
+      console.log(`[Human Mode] Removed ${removedCount}, surfaced ${surfacedCount}, rejected ${response.rejectedCount || 0} unverified decision(s).`);
+
+      chrome.storage.local.set({
+        [`lastResult_${window.location.hostname}`]: {
+          removedCount,
+          surfacedCount,
+          rejectedCount: response.rejectedCount || 0,
+          candidateCount: candidates.length,
+          timestamp: Date.now()
+        }
+      });
+    });
+  });
+})();
