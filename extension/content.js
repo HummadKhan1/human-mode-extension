@@ -19,9 +19,11 @@ const AI_KEYWORDS = [
   "overview", "bot widget", "messaging window"
 ];
 
+let globalCandidateCounter = 0; // persists across multiple scans so IDs never collide
+
 function getCandidates() {
   const all = document.querySelectorAll("body *");
-  const MAX_CANDIDATES = 60;
+  const MAX_CANDIDATES = 80; // balance between coverage and prompt size/cost
 
   // Two priority tiers instead of one flat cap. Real pages often load many
   // unrelated iframes (ads, analytics, tracking pixels) before the actual
@@ -84,7 +86,8 @@ function getCandidates() {
   }
 
   const selected = priority.concat(fallback).slice(0, MAX_CANDIDATES);
-  return selected.map((record, index) => {
+  return selected.map((record) => {
+    const index = globalCandidateCounter++;
     record._el.setAttribute("data-human-mode-id", String(index));
     const { _el, ...rest } = record;
     return { index, ...rest };
@@ -118,7 +121,10 @@ function applyDecisions(decisions) {
 (function main() {
   chrome.storage.local.get(["humanModeEnabled"], (data) => {
     if (data.humanModeEnabled === false) return; // default: on
+    runScan();
+  });
 
+  function runScan() {
     const candidates = getCandidates();
     if (candidates.length === 0) {
       console.log("[Human Mode] No candidate elements found on this page.");
@@ -150,8 +156,9 @@ function applyDecisions(decisions) {
       const { removedCount, surfacedCount } = applyDecisions(response.decisions || []);
       console.log(`[Human Mode] Removed ${removedCount}, surfaced ${surfacedCount}, rejected ${response.rejectedCount || 0} unverified decision(s).`);
 
+      const key = `lastResult_${window.location.hostname}`;
       chrome.storage.local.set({
-        [`lastResult_${window.location.hostname}`]: {
+        [key]: {
           removedCount,
           surfacedCount,
           rejectedCount: response.rejectedCount || 0,
@@ -160,5 +167,5 @@ function applyDecisions(decisions) {
         }
       });
     });
-  });
+  }
 })();

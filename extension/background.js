@@ -35,6 +35,56 @@ Page title: ${payload.title}
 Candidate elements (JSON array):
 ${JSON.stringify(payload.candidates, null, 2)}`;
 
+  // Retry once on a parse failure. This has been observed intermittently -
+  // the model occasionally adds stray text around the JSON array despite
+  // explicit formatting instructions. A single retry is cheap and handles
+  // the common case without masking a genuinely broken response.
+  let rawResult = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    rawResult = await callAndParse(apiKey, model, userPrompt);
+    if (!rawResult.error) break;
+    console.log(`[Human Mode] Attempt ${attempt + 1} failed: ${rawResult.error}${attempt === 0 ? " - retrying..." : " - giving up."}`);
+  }
+
+  if (rawResult.error) {
+    return rawResult;
+  }
+
+  const decisions = rawResult.decisions;
+
+  // --- Programmatic verification pass ---
+  // Every decision's "evidence" string must actually appear in that candidate's
+  // own captured fields. This is cheap (no extra API call) and catches the
+  // classifier hallucinating a removal that isn't grounded in real page content.
+  const candidateByIndex = new Map(payload.candidates.map(c => [c.index, c]));
+  const verified = [];
+  let rejectedCount = 0;
+
+  decisions.forEach(d => {
+    const candidate = candidateByIndex.get(d.index);
+    if (!candidate || !d.evidence || typeof d.evidence !== "string") {
+      rejectedCount++;
+      return;
+    }
+    const haystack = [candidate.id, candidate.class, candidate.ariaLabel, candidate.title, candidate.text]
+      .join(" ")
+      .toLowerCase();
+    const evidence = d.evidence.toLowerCase().trim();
+
+    if (evidence.length > 0 && haystack.includes(evidence)) {
+      verified.push(d);
+    } else {
+      rejectedCount++;
+    }
+  });
+
+  return { decisions: verified, rejectedCount };
+}
+
+// Handles just the API call and raw JSON parsing. Returns { decisions: [...] }
+// on success or { error: "..." } on failure. Does NOT do verification -
+// that needs payload.candidates, which stays in classifyCandidates's scope.
+async function callAndParse(apiKey, model, userPrompt) {
   let response;
   try {
     response = await fetch(ANTHROPIC_API_URL, {
@@ -89,32 +139,7 @@ ${JSON.stringify(payload.candidates, null, 2)}`;
     return { error: "Model output was not a JSON array." };
   }
 
-  // --- Programmatic verification pass ---
-  // Every decision's "evidence" string must actually appear in that candidate's
-  // own captured fields. This is cheap (no extra API call) and catches the
-  // classifier hallucinating a removal that isn't grounded in real page content.
-  const verified = [];
-  let rejectedCount = 0;
-
-  decisions.forEach(d => {
-    const candidate = payload.candidates[d.index];
-    if (!candidate || !d.evidence || typeof d.evidence !== "string") {
-      rejectedCount++;
-      return;
-    }
-    const haystack = [candidate.id, candidate.class, candidate.ariaLabel, candidate.title, candidate.text]
-      .join(" ")
-      .toLowerCase();
-    const evidence = d.evidence.toLowerCase().trim();
-
-    if (evidence.length > 0 && haystack.includes(evidence)) {
-      verified.push(d);
-    } else {
-      rejectedCount++;
-    }
-  });
-
-  return { decisions: verified, rejectedCount };
+  return { decisions };
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
