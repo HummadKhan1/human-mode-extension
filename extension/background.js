@@ -74,9 +74,14 @@ ${JSON.stringify(payload.candidates, null, 2)}`;
 
   let decisions;
   try {
-    const clean = textBlock.text.replace(/```json|```/g, "").trim();
+    let clean = textBlock.text.replace(/```json|```/g, "").trim();
+    // The model sometimes adds a stray sentence before/after the array even
+    // when told not to. Extract just the [...] portion as a fallback.
+    const arrayMatch = clean.match(/\[[\s\S]*\]/);
+    if (arrayMatch) clean = arrayMatch[0];
     decisions = JSON.parse(clean);
   } catch (e) {
+    console.log("[Human Mode] Raw model output that failed to parse:", textBlock.text);
     return { error: "Could not parse model output as JSON.", raw: textBlock.text };
   }
 
