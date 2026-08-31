@@ -56,6 +56,18 @@ ${JSON.stringify(payload.candidates, null, 2)}`;
   // Every decision's "evidence" string must actually appear in that candidate's
   // own captured fields. This is cheap (no extra API call) and catches the
   // classifier hallucinating a removal that isn't grounded in real page content.
+  //
+  // This alone isn't enough, though: it confirms evidence is REAL, not that
+  // it's SUFFICIENT. Found on Bing: the model correctly found "cdxShowConv"
+  // (a real class fragment meaning "chat mode toggled on") inside the search
+  // box's own wrapper div, and removed the whole wrapper - taking the real
+  // search bar down with it. The wrapper's class list also clearly contained
+  // "sbox"/"sb_expanded_wrapper" (Bing's own naming for "search box"), which
+  // should have overridden that conclusion. Added a second, independent
+  // guard: known core-functionality keywords in an element's own id/class
+  // block a removal outright, regardless of what evidence the model cited.
+  const PROTECTED_KEYWORDS = ["sbox", "searchbox", "search-box", "search_box", "nav-search"];
+
   const candidateByIndex = new Map(payload.candidates.map(c => [c.index, c]));
   const verified = [];
   let rejectedCount = 0;
@@ -66,6 +78,14 @@ ${JSON.stringify(payload.candidates, null, 2)}`;
       rejectedCount++;
       return;
     }
+
+    const idClass = [candidate.id, candidate.class].join(" ").toLowerCase();
+    if (d.action === "remove" && PROTECTED_KEYWORDS.some(k => idClass.includes(k))) {
+      console.log(`[Human Mode] Blocked removal of candidate ${d.index} - id/class matched a protected keyword despite model evidence:`, candidate);
+      rejectedCount++;
+      return;
+    }
+
     const haystack = [candidate.id, candidate.class, candidate.ariaLabel, candidate.title, candidate.text]
       .join(" ")
       .toLowerCase();
