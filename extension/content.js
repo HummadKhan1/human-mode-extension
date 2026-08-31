@@ -19,10 +19,35 @@ const AI_KEYWORDS = [
   "overview", "bot widget", "messaging window"
 ];
 
+// Plain document.querySelectorAll("body *") cannot see inside shadow DOM
+// boundaries - many modern sites build interactive widgets (chat bubbles,
+// assistants) as web components that render their real content inside a
+// shadow root. Found on Walmart: Sparky's button had a clear, matchable
+// aria-label ("Open sparky, your AI shopping assistant") but the whole page
+// only yielded 5 total candidates, suggesting most of the interactive UI
+// was invisible to a normal DOM query. This walks into any OPEN shadow
+// roots recursively. Closed shadow roots remain a genuine, unavoidable
+// blind spot - there is no JS API to access them from outside.
+function getAllElementsIncludingShadowDOM(root) {
+  const results = [];
+  function walk(node) {
+    if (!node || !node.querySelectorAll) return;
+    const children = node.querySelectorAll("*");
+    children.forEach(el => {
+      results.push(el);
+      if (el.shadowRoot) {
+        walk(el.shadowRoot);
+      }
+    });
+  }
+  walk(root);
+  return results;
+}
+
 let globalCandidateCounter = 0; // persists across multiple scans so IDs never collide
 
 function getCandidates() {
-  const all = document.querySelectorAll("body *");
+  const all = getAllElementsIncludingShadowDOM(document.body);
   const MAX_CANDIDATES = 80; // balance between coverage and prompt size/cost
 
   // Two priority tiers instead of one flat cap. Real pages often load many
@@ -70,7 +95,18 @@ function getCandidates() {
     }
 
     const haystack = [id, cls, ariaLabel, title, text, iframeTitle].join(" ").toLowerCase();
-    const matchesKeyword = AI_KEYWORDS.some(k => haystack.includes(k));
+    const matchesKeywordPhrase = AI_KEYWORDS.some(k => haystack.includes(k));
+    // Found on Yahoo: an element's aria-label said "Yahoo AI Information
+    // Description" - a completely genuine AI signal, but it matched none of
+    // our specific phrases (ai summary/ai overview/etc.), so it was never
+    // even extracted as a candidate. Substring-matching bare "ai" would
+    // create false positives on unrelated words (detail, email, said,
+    // contain), so instead match "AI" as a standalone WORD - surrounded by
+    // non-letter characters on both sides. This catches genuine uses
+    // ("Yahoo AI", "using AI to") without matching words that merely
+    // contain the letters "ai".
+    const matchesStandaloneAI = /\bai\b/i.test(haystack);
+    const matchesKeyword = matchesKeywordPhrase || matchesStandaloneAI;
 
     const record = {
       tag, id, class: cls.slice(0, 150), ariaLabel, title, role,
@@ -98,21 +134,49 @@ function applyDecisions(decisions) {
   let removedCount = 0;
   let surfacedCount = 0;
 
-  decisions.forEach(d => {
+  // Resolve elements first, before removing anything, so ancestor/descendant
+  // checks below see the real, un-mutated DOM tree.
+  const removeTargets = decisions
+    .filter(d => d.action === "remove")
+    .map(d => ({ d, el: document.querySelector(`[data-human-mode-id="${d.index}"]`) }))
+    .filter(x => x.el);
+
+  // Found on Yahoo: the model flagged both a broad wrapper div ("max-w-
+  // screen-sm mx-auto" - a generic, reused layout utility class) AND the
+  // actual, specific summary card nested inside it, both labeled "AI-
+  // generated summary feature." Removing the outer wrapper took real
+  // article paragraphs with it, since they happened to be siblings inside
+  // the same generic wrapper. Fix: if one remove-target is an ancestor of
+  // another remove-target, skip removing the ancestor - the more specific
+  // descendant already achieves the visible removal, without the risk of
+  // sweeping in unrelated content that happens to share the same wrapper.
+  const skippedAncestors = new Set();
+  removeTargets.forEach(({ el }) => {
+    removeTargets.forEach(({ el: otherEl }) => {
+      if (el !== otherEl && el.contains(otherEl)) {
+        skippedAncestors.add(el);
+      }
+    });
+  });
+
+  removeTargets.forEach(({ d, el }) => {
+    if (skippedAncestors.has(el)) {
+      console.log(`[Human Mode] Skipped removing candidate ${d.index} - it's an ancestor of another removed element, removing it too could sweep in unrelated content.`);
+      return;
+    }
+    el.style.setProperty("display", "none", "important");
+    el.setAttribute("data-human-mode-removed", "agent");
+    el.setAttribute("data-human-mode-reason", d.reason || "");
+    removedCount++;
+  });
+
+  decisions.filter(d => d.action === "surface").forEach(d => {
     const el = document.querySelector(`[data-human-mode-id="${d.index}"]`);
     if (!el) return;
-
-    if (d.action === "remove") {
-      el.style.setProperty("display", "none", "important");
-      el.setAttribute("data-human-mode-removed", "agent");
-      el.setAttribute("data-human-mode-reason", d.reason || "");
-      removedCount++;
-    } else if (d.action === "surface") {
-      el.style.setProperty("outline", "3px solid #2563eb", "important");
-      el.style.setProperty("outline-offset", "2px", "important");
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      surfacedCount++;
-    }
+    el.style.setProperty("outline", "3px solid #2563eb", "important");
+    el.style.setProperty("outline-offset", "2px", "important");
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    surfacedCount++;
   });
 
   return { removedCount, surfacedCount };

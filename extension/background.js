@@ -74,6 +74,17 @@ ${JSON.stringify(payload.candidates, null, 2)}`;
   // with AI - the model fabricated the "AI-driven" framing rather than citing
   // a genuine AI signal. Added sign-in/auth terms alongside the search-box
   // terms as known legitimate non-AI functionality.
+  // Added after Yahoo: the model removed an entire <header> element outright,
+  // citing "AI search assistant feature integrated into header" - but the
+  // header's actual classes (module-uh, font-yahoosans, sticky, bg-uds-...)
+  // show no real AI signal at all. This looks like outright hallucination,
+  // not just real-but-irrelevant evidence like the Etsy/One-Tap case. A
+  // structural fix is more robust than another keyword: a legitimate AI
+  // feature is always a SPECIFIC WIDGET inside a header/nav/footer, never
+  // the entire landmark region itself. Block removal of these tags outright,
+  // regardless of what evidence the model cites.
+  const PROTECTED_TAGS = ["header", "nav", "footer", "body", "html"];
+
   const PROTECTED_KEYWORDS = [
     "sbox", "searchbox", "search-box", "search_box", "nav-search",
     "one-tap", "onetap", "signin", "sign-in", "login", "log-in", "auth", "credential"
@@ -86,6 +97,12 @@ ${JSON.stringify(payload.candidates, null, 2)}`;
   decisions.forEach(d => {
     const candidate = candidateByIndex.get(d.index);
     if (!candidate || !d.evidence || typeof d.evidence !== "string") {
+      rejectedCount++;
+      return;
+    }
+
+    if (d.action === "remove" && PROTECTED_TAGS.includes((candidate.tag || "").toLowerCase())) {
+      console.log(`[Human Mode] Blocked removal of candidate ${d.index} - "${candidate.tag}" is a protected structural landmark, never removable outright:`, candidate);
       rejectedCount++;
       return;
     }
