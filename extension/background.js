@@ -16,6 +16,7 @@ Classify each candidate as one of:
 
 Rules:
 - For every "remove" or "surface" decision, include an "evidence" field: an exact substring copied from that element's id, class, ariaLabel, title, or text field that justifies the decision. If you can't point to real evidence in the given fields, do not classify it as remove/surface.
+- The evidence must be a genuine AI-related signal (e.g. references to AI, chat, assistant, copilot, chatbot, generated/summary content). A big tech company's name appearing in an id/class is NOT evidence of an AI feature by itself - e.g. "google-one-tap" is Google's standard sign-in/credential autofill feature and has nothing to do with AI, even though "google" appears in it. Do not infer "this is AI-related" just because a well-known company name is present.
 - Only output entries for "remove" or "surface" decisions. Omit anything you'd classify as "keep" - do not include it in the array at all.
 - Respond with ONLY a JSON array, no prose, no markdown fences. Example:
 [{"index": 3, "action": "remove", "evidence": "rufus", "reason": "AI shopping assistant widget"}]`;
@@ -66,7 +67,17 @@ ${JSON.stringify(payload.candidates, null, 2)}`;
   // should have overridden that conclusion. Added a second, independent
   // guard: known core-functionality keywords in an element's own id/class
   // block a removal outright, regardless of what evidence the model cited.
-  const PROTECTED_KEYWORDS = ["sbox", "searchbox", "search-box", "search_box", "nav-search"];
+  // Expanded after Etsy: the model flagged Google One Tap (a standard sign-in/
+  // credential autofill feature, completely unrelated to AI) for removal,
+  // citing "google-one-tap-modal-div" as evidence. That text is real and
+  // grounded (verification alone let it through), but it has nothing to do
+  // with AI - the model fabricated the "AI-driven" framing rather than citing
+  // a genuine AI signal. Added sign-in/auth terms alongside the search-box
+  // terms as known legitimate non-AI functionality.
+  const PROTECTED_KEYWORDS = [
+    "sbox", "searchbox", "search-box", "search_box", "nav-search",
+    "one-tap", "onetap", "signin", "sign-in", "login", "log-in", "auth", "credential"
+  ];
 
   const candidateByIndex = new Map(payload.candidates.map(c => [c.index, c]));
   const verified = [];
